@@ -4,16 +4,41 @@ This repo is the self-contained bundle for the Claude Code Routine that tailors 
 
 ## Trigger contract
 
-The Routine is invoked via API trigger with a structured payload:
+The Routine is invoked via the API trigger's `/fire` endpoint. The endpoint accepts exactly ONE optional field: `text`. Its value is freeform — the trigger does NOT parse JSON, structured payloads, or alternate field names. Anything other than `text` is silently dropped. Everything the Routine needs at trigger time must be packed into this single string, and the Routine parses it back out.
 
-```json
-{
-  "threadId": "<opaque string from upstream caller>",
-  "jobDescription": "<raw JD text or URL>"
-}
+### Payload format
+
+The upstream caller MUST format `text` as a tagged blob:
+
+```
+<thread_id>gmail thread id</thread_id>
+<jd>
+raw email body, multiline ok
+</jd>
 ```
 
-Both fields are REQUIRED. The Routine MUST NOT proceed if either is missing or empty; instead, fail fast with a clear error message and exit.
+### Parsing rules
+
+The Routine MUST extract two values from `text`:
+
+- `threadId` — the substring between `<thread_id>` and `</thread_id>`, trimmed of surrounding whitespace
+- `jobDescription` — the substring between `<jd>` and `</jd>`, preserved verbatim including line breaks and inner whitespace
+
+Tags are case-sensitive (`<thread_id>`, not `<threadId>` or `<thread-id>`). Both tags are REQUIRED. The `<jd>` content may span multiple lines and contain any characters, including angle brackets, but it MUST NOT contain the literal closing tag `</jd>` (the caller is responsible for ensuring this; the Routine does not unescape).
+
+A reference Node parser:
+
+```js
+const m = (text, open, close) => {
+  const re = new RegExp(`${open}([\\s\\S]*?)${close}`);
+  const match = text.match(re);
+  return match ? match[1].trim() : null;
+};
+const threadId = m(text, '<thread_id>', '</thread_id>');
+const jobDescription = m(text, '<jd>', '</jd>'); // optionally skip .trim() if leading whitespace matters
+```
+
+If either tag is missing, malformed, or extracts to an empty string after trimming, fail fast with an error that names the offending tag. Log only the failure mode, never the raw `text` blob (it contains JD content). Exit non-zero so the upstream caller can surface the malformed payload.
 
 ## What the Routine does (end to end)
 
@@ -27,7 +52,7 @@ For every triggered run, follow this exact sequence:
 
    Check-first: a no-op (~50ms) when `docx` is already present; falls through to a global install (~5–10s) when missing. Fail fast if the install itself errors.
 
-1. **Validate input.** Confirm `threadId` and `jobDescription` are present. If `jobDescription` is a URL, fetch it; if it's raw text, use as-is.
+1. **Parse and validate input.** Extract `threadId` and `jobDescription` from the trigger's `text` field per the parsing rules in the Trigger contract section above. Confirm both are present and non-empty after trimming. `jobDescription` is treated as raw text and used as-is (the parsing rules do NOT accept URLs; if a caller sends a URL, treat the URL string itself as the JD body).
 2. **Tailor the resume.** Follow the instructions in [`./skill/SKILL.md`](./skill/SKILL.md) end-to-end. The skill produces a `.docx` resume file written to a temp path.
 3. **Upload the resume to Drive.** Use the Google Drive MCP to upload the `.docx` into the folder identified by env var `RESUME_DRIVE_FOLDER_ID`. Capture the returned Drive `fileId` as `resumeFileId`.
 4. **Upload the JD to Drive.** Save the JD text (the raw text used in step 2, plus the screening-prep notes the skill generates) as a `.txt` file into the folder identified by env var `JD_DRIVE_FOLDER_ID`. Capture the returned Drive `fileId` as `jdFileId`.
