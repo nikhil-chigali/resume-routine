@@ -75,7 +75,7 @@ For every triggered run, follow this exact sequence:
    Build the body inside a subprocess so the base64 payloads never enter the model's token stream — that keeps the run as fast as a native upload would have been and avoids spending output tokens on file contents. Reference invocation:
 
    ```bash
-   curl -sS -L -X POST "$APPS_SCRIPT_WEBAPP_URL" \
+   curl -sS -L "$APPS_SCRIPT_WEBAPP_URL" \
      -H "Content-Type: application/json" \
      -d "$(node -e 'const fs=require("fs");process.stdout.write(JSON.stringify({
            secret: process.env.WEBAPP_SECRET,
@@ -87,7 +87,11 @@ For every triggered run, follow this exact sequence:
          }))')"
    ```
 
-   The `-L` flag is **load-bearing**: Apps Script `/exec` URLs 302-redirect to `script.googleusercontent.com`. `curl -L` follows the redirect; plain Node `https.request` does NOT and you would get a silent empty 302 with no error. Keep `-L`.
+   Two curl details are **load-bearing**:
+
+   - **Keep `-L`.** Apps Script `/exec` URLs 302-redirect to `script.googleusercontent.com/macros/echo`, which is what actually serves the `doPost` return value. `curl -L` follows the redirect; plain Node `https.request` does NOT and you would get a silent empty 302 with no error.
+   - **Do NOT add `-X POST`.** The `-d` flag already makes the initial request a POST. Adding `-X POST` forces the POST method onto the redirected request as well, but the echo endpoint only accepts GET, so it answers 405 and you never read the response body. Without `-X POST`, curl correctly downgrades to GET when following the 302. (This combination, `-L -X POST`, is a silent footgun: the POST to `/exec` still runs `doPost` with all its side effects, but you get a 405 instead of the `{ ok: true }` confirmation, so it looks like a failure when the archive and reply may have already happened.)
+   - **A successful response body is JSON** (`{ ok: true, ... }`). If the body is HTML (a Google error page such as `ReferenceError: ... is not defined`), `doPost` threw an uncaught exception on the webhook side — e.g. a missing helper function or a stale deployment serving old code. Treat a non-JSON / HTML response as fatal: exit non-zero and surface that the Apps Script deployment needs attention. It is not something the Routine can fix, and because `doPost` may have completed its Drive / Gmail side effects before crashing on the response, do NOT blindly re-POST (you would duplicate the archive and the reply) — verify state first.
 
    The webhook responds with `{ ok: true, resumeFileId, jdFileId }` on success. Capture those file IDs and log them; do NOT use them for any control flow inside the Routine (they are observability only).
 
@@ -129,5 +133,7 @@ The webhook POST is atomic from the Routine's perspective: either it succeeds (`
 - **Transient failure** (network timeout, 5xx): retry once with a short backoff (~2s). On the second failure, exit non-zero so the upstream caller can decide whether to re-fire.
 - **Authoritative failure** (4xx other than 429): do not retry. Log status + threadId, exit non-zero.
 - **Webhook returns `{ ok: false, error: ... }`** with HTTP 200: treat as a logical failure. Log the `error` field (it is a short tag like `unauthorized`, `thread_not_found`, never PII) and exit non-zero.
+- **Egress blocked at the network proxy** (curl exits with code 56 / `http=000` and the agent proxy reports a 403/407 CONNECT denial for `script.google.com`): this is NOT transient. The Routine environment's network policy does not permit the webhook host. Do not retry or route around it; exit non-zero and surface that the environment must allow egress to `script.google.com` and `script.googleusercontent.com` (the `/exec` redirect target).
+- **Webhook returns an HTML error page** (HTTP 200 but the body is HTML, not JSON): `doPost` threw an uncaught exception (webhook-side bug or stale deployment). Treat as fatal; exit non-zero. Note the side effects may already have run, so do NOT auto-re-POST.
 
 If Steps 0, 1, or 2 fail before the POST is attempted, do NOT POST. Exit non-zero with the step that failed in the error message.
