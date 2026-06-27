@@ -9,7 +9,7 @@ API trigger ──▶ Routine clones this repo ──▶ Reads CLAUDE.md
                                                   │
                                                   ▼
                                          Step 0: Ensure docx installed
-                                         Step 1: Validate { threadId, jobDescription }
+                                         Step 1: Parse text → { threadId, jobDescription }
                                          Step 2: Run skill (tailor resume)
                                                   │
                                                   ▼
@@ -71,16 +71,33 @@ Copy the deployed Web App URL.
 
 ### 4. Trigger contract
 
-Configure the API trigger to POST a payload of:
+The `/fire` endpoint of the Claude Code Routine API accepts exactly ONE optional field, `text`. The value is freeform; structured payloads, JSON objects, and alternate field names are NOT parsed — anything other than `text` is silently dropped.
 
-```json
-{
-  "threadId": "<opaque string from upstream caller>",
-  "jobDescription": "<raw JD text or URL>"
-}
+Pack everything the Routine needs into the single `text` string using this tagged format:
+
+```
+<thread_id>gmail thread id</thread_id>
+<jd>
+raw email body, multiline ok
+</jd>
 ```
 
-Both fields are required. The Routine fails fast and exits non-zero if either is missing.
+The Routine parses both values back out at Step 1:
+- `thread_id` → opaque string passed through to the webhook
+- `jd` → raw JD body, multiline allowed
+
+Tags are case-sensitive. Both are REQUIRED. If either tag is missing, malformed, or empty after trimming, the Routine fails fast (no Drive uploads, no webhook POST). Closing tag `</jd>` inside the JD body would break the parser; the caller is responsible for either not embedding it or escaping it upstream.
+
+Example `curl` against the `/fire` endpoint:
+
+```bash
+curl -X POST "$FIRE_URL" \
+  -H "Authorization: Bearer $FIRE_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "<thread_id>abc123</thread_id>\n<jd>\nSenior AI Engineer (Remote)...\n</jd>"}'
+```
+
+For the full parsing rules and reference Node parser, see [`CLAUDE.md`](./CLAUDE.md) §Trigger contract.
 
 ## Local smoke test
 
@@ -118,7 +135,7 @@ The local `resume-tailor` skill at `<project_root>/.claude/skills/resume-tailor/
 
 | Failure | Behavior |
 |---|---|
-| Missing `threadId` or `jobDescription` | Fail fast, exit non-zero, no Drive uploads, no POST. |
+| Malformed `text` payload (missing `<thread_id>` or `<jd>` tag, empty after trim) | Fail fast naming the offending tag, exit non-zero, no Drive uploads, no POST. Do NOT log the raw `text` blob (contains JD content). |
 | Missing env var at runtime | Fail fast, name the missing var, exit non-zero. |
 | `docx` install fails | Fail fast on Step 0, exit non-zero. |
 | Resume Drive upload fails | If JD upload also fails, exit non-zero with no POST. If JD upload succeeds, POST with `status: "partial"` and `resumeFileId: null`. |
