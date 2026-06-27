@@ -1,6 +1,6 @@
 ---
 name: resume-tailor-routine
-description: Tailor Nikhil Chigali's master resume to a specific job description from inside a Claude Code Routine. Produces a .docx written to a temp path so the Routine orchestrator can upload it to Google Drive. This is the Routine-context adaptation of the local resume-tailor skill — same selection logic, different output sink.
+description: Tailor Nikhil Chigali's master resume to a specific job description from inside a Claude Code Routine. Produces a .docx written to a temp path so the Routine orchestrator can base64-encode it and POST it to an Apps Script webhook. This is the Routine-context adaptation of the local resume-tailor skill — same selection logic, different output sink.
 ---
 
 # Resume Tailor (Routine context)
@@ -22,11 +22,11 @@ This skill is invoked by the Routine entrypoint defined in [`../CLAUDE.md`](../C
 
 | Output | Description |
 |---|---|
-| `resumeDocxPath` | Absolute path to the generated `.docx` (in a temp directory). The orchestrator uploads it to Drive. |
-| `jdTextPath` | Absolute path to the saved JD `.txt` (in a temp directory). The orchestrator uploads it to Drive. The text includes the raw JD plus a screening-prep notes block this skill appends. |
+| `resumeDocxPath` | Absolute path to the generated `.docx` (in a temp directory). The orchestrator base64-encodes the file bytes and inlines them in the webhook POST. |
+| `jdTextPath` | Absolute path to the saved JD `.txt` (in a temp directory). The orchestrator base64-encodes and inlines this too. The text includes the raw JD plus a screening-prep notes block this skill appends. |
 | `companyRoleSlug` | PascalCase company + role string used in both filenames (e.g. `BradsbyGroup_AIEngineer`). Cold-send fallback: `General_<RoleType>`. |
 
-After the orchestrator's Drive uploads succeed, it POSTs the webhook per [`../CLAUDE.md`](../CLAUDE.md). After the POST, the orchestrator deletes both temp files.
+After this skill returns, the orchestrator POSTs both files (as `resumeB64` + `jdB64`) plus the slug-derived names to the Apps Script webhook per [`../CLAUDE.md`](../CLAUDE.md) Step 3. The Routine itself does NOT touch Drive; `doPost` archives the files and replies on the Gmail thread under the user's own Google identity. After the POST, the orchestrator deletes both temp files.
 
 ## Naming convention
 
@@ -194,7 +194,7 @@ Return (or expose for the orchestrator to pick up):
 - `jdTextPath` = the temp `.txt` absolute path
 - `companyRoleSlug` = the PascalCase company+role used in both filenames
 
-The orchestrator handles Drive upload, webhook POST, and temp-file cleanup. Do not delete the temp files yourself.
+The orchestrator base64-encodes both files, POSTs them to the Apps Script webhook, and then deletes the temp files. Do not delete the temp files yourself.
 
 ## Style rules (enforced, same as local skill)
 
@@ -215,7 +215,7 @@ The orchestrator handles Drive upload, webhook POST, and temp-file cleanup. Do n
 2. **Preserve canonical metrics verbatim.** Pull from the METRICS table by ID. Do not rephrase, round, or merge.
 3. **Honesty on gaps beats keyword stuffing.** An ATS-beating resume that fails the screen is worse than an honest one that passes fewer filters.
 4. **Two pages is the default.** Longer only on explicit upstream instruction.
-5. **Output must be a `.docx`.** The orchestrator uploads `.docx` to Drive; PDF / markdown are NOT acceptable.
+5. **Output must be a `.docx`.** The orchestrator sends `.docx` bytes to the Apps Script webhook for Drive archive + Gmail attachment; PDF / markdown are NOT acceptable.
 6. **No em-dashes in prose.** Enforce even if the master accidentally contains them.
 7. **Silent gap-check.** The Routine has no user to ask; document gaps in the JD `.txt` for downstream screening.
 8. **The template at `../master/build_resume.js` stays untouched.** Adapt to a temp working file per run; delete the working file after success.

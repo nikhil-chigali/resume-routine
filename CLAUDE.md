@@ -1,6 +1,6 @@
 # Resume Tailor Routine
 
-This repo is the self-contained bundle for the Claude Code Routine that tailors Nikhil Chigali's master resume to a specific job description, then uploads the artifacts to Google Drive and notifies a downstream webhook.
+This repo is the self-contained bundle for the Claude Code Routine that tailors Nikhil Chigali's master resume to a specific job description, then POSTs the artifacts as base64-encoded bytes to a Google Apps Script webhook. The webhook archives the files to Drive and replies on the Gmail thread, all running under the user's own Google identity. The Routine itself never touches Drive or Gmail.
 
 ## Trigger contract
 
@@ -53,34 +53,58 @@ For every triggered run, follow this exact sequence:
    Check-first: a no-op (~50ms) when `docx` is already present; falls through to a global install (~5–10s) when missing. Fail fast if the install itself errors.
 
 1. **Parse and validate input.** Extract `threadId` and `jobDescription` from the trigger's `text` field per the parsing rules in the Trigger contract section above. Confirm both are present and non-empty after trimming. `jobDescription` is treated as raw text and used as-is (the parsing rules do NOT accept URLs; if a caller sends a URL, treat the URL string itself as the JD body).
-2. **Tailor the resume.** Follow the instructions in [`./skill/SKILL.md`](./skill/SKILL.md) end-to-end. The skill produces a `.docx` resume file written to a temp path.
-3. **Upload the resume to Drive.** Use the Google Drive MCP to upload the `.docx` into the folder identified by env var `RESUME_DRIVE_FOLDER_ID`. Capture the returned Drive `fileId` as `resumeFileId`.
-4. **Upload the JD to Drive.** Save the JD text (the raw text used in step 2, plus the screening-prep notes the skill generates) as a `.txt` file into the folder identified by env var `JD_DRIVE_FOLDER_ID`. Capture the returned Drive `fileId` as `jdFileId`.
-5. **POST to the Apps Script webhook.** Send a POST request to the URL in env var `APPS_SCRIPT_WEBAPP_URL` with this exact JSON body:
+2. **Tailor the resume.** Follow the instructions in [`./skill/SKILL.md`](./skill/SKILL.md) end-to-end. The skill produces two files at temp paths and hands the paths plus the company/role slug back to the orchestrator:
+   - `<TMPDIR>/Nikhil_Chigali_Resume_<Company>_<Role>.docx` — the tailored resume
+   - `<TMPDIR>/Nikhil_Chigali_Resume_<Company>_<Role>.txt` — the JD body plus the screening-prep notes the skill appends
+
+3. **POST to the Apps Script webhook.** Send a single POST to the URL in env var `APPS_SCRIPT_WEBAPP_URL` with both files inlined as base64. The webhook handles Drive archiving AND the Gmail reply atomically; the Routine does NOT touch Drive directly and does NOT need a Google connector.
+
+   POST body (JSON, `Content-Type: application/json`):
 
    ```json
    {
      "secret": "<value of WEBAPP_SECRET env var>",
-     "threadId": "<the threadId from the trigger>",
-     "resumeFileId": "<Drive fileId of the uploaded resume>",
-     "jdFileId": "<Drive fileId of the uploaded JD>"
+     "threadId": "<the threadId parsed from the trigger>",
+     "resumeB64": "<base64 of the .docx bytes>",
+     "resumeName": "Nikhil_Chigali_Resume_<Company>_<Role>.docx",
+     "jdB64": "<base64 of the .txt bytes>",
+     "jdName": "Nikhil_Chigali_Resume_<Company>_<Role>.txt"
    }
    ```
 
-   `Content-Type: application/json`. Retry on transient failure (timeout, 5xx) with one backoff retry. On final failure, log the payload and the response body, then exit non-zero.
+   Build the body inside a subprocess so the base64 payloads never enter the model's token stream — that keeps the run as fast as a native upload would have been and avoids spending output tokens on file contents. Reference invocation:
 
-6. **Cleanup.** Delete any local temp files (the working build script copy, the `.docx`, the JD `.txt`). The Routine's only persistent outputs are the two Drive uploads and the webhook POST.
+   ```bash
+   curl -sS -L -X POST "$APPS_SCRIPT_WEBAPP_URL" \
+     -H "Content-Type: application/json" \
+     -d "$(node -e 'const fs=require("fs");process.stdout.write(JSON.stringify({
+           secret: process.env.WEBAPP_SECRET,
+           threadId: process.env.THREAD_ID,
+           resumeB64: fs.readFileSync(process.env.RESUME_PATH).toString("base64"),
+           resumeName: process.env.RESUME_NAME,
+           jdB64: fs.readFileSync(process.env.JD_PATH).toString("base64"),
+           jdName: process.env.JD_NAME
+         }))')"
+   ```
+
+   The `-L` flag is **load-bearing**: Apps Script `/exec` URLs 302-redirect to `script.googleusercontent.com`. `curl -L` follows the redirect; plain Node `https.request` does NOT and you would get a silent empty 302 with no error. Keep `-L`.
+
+   The webhook responds with `{ ok: true, resumeFileId, jdFileId }` on success. Capture those file IDs and log them; do NOT use them for any control flow inside the Routine (they are observability only).
+
+   Retry once on transient failure (timeout or 5xx). On final failure, log only the response status, the threadId, and a generic error tag — NEVER log the response body or the POST body (both contain base64 of the resume). Exit non-zero.
+
+4. **Cleanup.** Delete the temp `.docx`, the temp `.txt`, and the working build script copy. The Routine's only persistent output is the webhook POST; Drive archiving, Gmail reply drafting/sending, and label updates are all owned by the Apps Script side.
 
 ## Required environment variables
 
 | Var | Purpose |
 |---|---|
-| `RESUME_DRIVE_FOLDER_ID` | Drive folder ID where tailored `.docx` resumes are uploaded |
-| `JD_DRIVE_FOLDER_ID` | Drive folder ID where JD `.txt` files are uploaded |
 | `APPS_SCRIPT_WEBAPP_URL` | URL of the Apps Script Web App that receives the POST |
 | `WEBAPP_SECRET` | Shared secret included verbatim in the POST body for the webhook to validate |
 
 If any env var is missing at run time, fail fast with a clear error naming the missing var. Do not invent fallback values.
+
+The Drive folder IDs that used to live here have moved to **Apps Script Script Properties** (`RESUME_FOLDER_ID`, `JD_FOLDER_ID`). They are no longer the Routine's concern — `doPost` reads them directly.
 
 ## Files in this repo
 
@@ -91,12 +115,19 @@ If any env var is missing at run time, fail fast with a clear error naming the m
 
 ## Non-negotiables
 
-- **No filesystem persistence between runs.** All artifacts go to Drive + webhook. The repo state is read-only at runtime.
-- **No fabrication.** The honest-gap discipline in the master is binding. If a JD requires a capability not in the master and not in the honest-gaps table, surface it in the JD `.txt` upload as a noted gap. Do NOT silently invent.
+- **No filesystem persistence between runs.** The Routine's only persistent output is the webhook POST. The repo state is read-only at runtime.
+- **No fabrication.** The honest-gap discipline in the master is binding. If a JD requires a capability not in the master and not in the honest-gaps table, surface it in the JD `.txt` (which the webhook archives to Drive) as a noted gap. Do NOT silently invent.
 - **Style rules are enforced.** No em-dashes in prose. No AI-tell phrases ("track record," "leverage" as verb, "transformative," "robust," "seamlessly," "cutting-edge," "spearheaded"). Calibri throughout. US Letter, ~0.7" margins, 2-page target.
-- **No PII leakage outside Drive + webhook.** The Routine MUST NOT log JD content, resume content, or env var values to stdout/stderr in production. Log only the threadId, the two fileIds, and high-level status.
+- **No PII to logs.** The Routine MUST NOT log JD content, resume content, base64 payloads, or env var values. Log only the threadId, the two fileIds the webhook returns, and high-level status (e.g., `posted`, `retried`, `failed`).
+- **Base64 stays out of the model context.** Build the POST body in a subprocess (the `node -e ...` pattern above). The model writes the curl invocation once; the file bytes never reach the token stream.
 - **The secret stays in the webhook body only.** Do NOT echo `WEBAPP_SECRET` into logs or include it in headers, query strings, or filenames.
 
 ## On failure
 
-If any step fails after the Drive uploads have succeeded, still POST the webhook with whichever fileIds you have plus a `status: "partial"` field added to the body. If both uploads fail, do NOT POST; exit non-zero so the upstream caller can retry.
+The webhook POST is atomic from the Routine's perspective: either it succeeds (`{ ok: true, ... }`) or it fails. There is no partial-success state to handle on the Routine side — `doPost` owns its own internal failure modes (Drive write failed, Gmail thread missing, label not found, etc.) and surfaces them in the response.
+
+- **Transient failure** (network timeout, 5xx): retry once with a short backoff (~2s). On the second failure, exit non-zero so the upstream caller can decide whether to re-fire.
+- **Authoritative failure** (4xx other than 429): do not retry. Log status + threadId, exit non-zero.
+- **Webhook returns `{ ok: false, error: ... }`** with HTTP 200: treat as a logical failure. Log the `error` field (it is a short tag like `unauthorized`, `thread_not_found`, never PII) and exit non-zero.
+
+If Steps 0, 1, or 2 fail before the POST is attempted, do NOT POST. Exit non-zero with the step that failed in the error message.
