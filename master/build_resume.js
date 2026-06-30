@@ -25,7 +25,7 @@ const {
 // Default output goes into tailored_resumes/. Fill in <Company>_<Role>.
 const OUTPUT_PATH = process.env.RESUME_OUTPUT || './tailored_resumes/Nikhil_Chigali_Resume_<Company>_<Role>.docx';
 
-// US Letter, tight-but-readable margins for a 2-page target
+// US Letter, tight-but-readable margins; 2 pages preferred, 3 pages acceptable
 const PAGE = {
   size: { width: 12240, height: 15840 },
   margin: { top: 720, right: 1000, bottom: 720, left: 1000 },

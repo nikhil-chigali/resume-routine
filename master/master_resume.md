@@ -21,7 +21,7 @@ Every selectable item (summary variant, skill group, bullet, project, etc.) has:
 2. **Classify role archetype** using the "Role Archetypes" section below.
 3. **Pick ONE summary variant** that matches the archetype. You may lightly edit it to hit 2–3 JD keywords naturally, but do not fabricate capabilities.
 4. **Select skill groups.** Tailored resumes should have 5–7 skill categories, not all 13. Always include groups with `strength: S` for the archetype. Include `familiar` items only if the JD explicitly names them; otherwise omit.
-5. **Select experience bullets.** 3 bullets per role is the default for a 2-page tailored resume. Prefer bullets where `keywords` overlap JD requirements AND `strength` is high. Never exceed 4 bullets for any single role.
+5. **Select experience bullets.** 3 bullets per role is the default, sized to a 2-page-preferred target. Page length is a soft preference; do not drop content to compress. Prefer bullets where `keywords` overlap JD requirements AND `strength` is high. Never exceed 4 bullets for any single role.
 6. **Select projects.** 2–3 projects typical. Pick the highest-`strength` projects for the archetype.
 7. **Include publications, education** unchanged unless space requires trimming.
 8. **Never invent content.** If the JD requires something marked `truth: none` in this doc (e.g. a specific framework you haven't used), either omit it or honestly disclaim it. Do not hallucinate experience.
@@ -709,7 +709,7 @@ For behavioral questions. Maps themes to the strongest supporting story.
 
 When producing the tailored .docx:
 
-- **Page size:** US Letter (8.5" × 11") with ~0.7" margins for 2-page output; ~0.75" margins for 1-page
+- **Page size:** US Letter (8.5" × 11") with ~0.7" margins; 2 pages preferred but soft, 3 pages acceptable. ~0.75" margins for the rare 1-page variant.
 - **Font:** Calibri throughout, 10pt body / 11pt role headers / 16pt name header
 - **Section headings:** ALL CAPS, bold, 11pt, with a thin black bottom border
 - **Role headers:** Company bold on left, location bold right-aligned; role italic on left, dates italic right-aligned

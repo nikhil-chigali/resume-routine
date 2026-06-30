@@ -94,7 +94,9 @@ Follow the master's AGENT INSTRUCTIONS. Quick summary:
 
 **Skills:** 5–7 lines. Always include S-tier groups for the archetype. Include `truth: familiar` items ONLY if the JD explicitly names them. Within a group, reorder so JD-matched items lead. **Label categories using JD vocabulary** when the JD names a specific area (e.g. for an LLM Engineer JD that names "RAG and knowledge bases," "prompt engineering, few-shot," "evaluation/benchmarking," use those exact phrasings).
 
-**Experience bullets:** 3 per role default; 4 max for most-recent/most-relevant; 2 for older/less-relevant. Compress further to 2 + 1 when Projects-above-Experience tightens the page.
+**Experience:** **Every experience section in the master MUST appear in the output** (Verizon + D2K + Microsoft + Indian Servers). Omitting a role to chase archetype-fit is not allowed — it reads as an unexplained gap.
+
+**Experience bullets:** **Minimum 3 per role (hard floor)**, default 3, max 4 for the most-recent/most-relevant role. When JD scope exists, tailor; when a role has no JD-relevant angle, retain the master's bullets verbatim at the floor. Page length is a soft preference (see Step 7) — do not trim experience bullets to compress the page. If page pressure remains after a relaxed pass, the resume can run to three pages. (Exception: if the master itself has fewer than 3 bullets for a role, surface that to the user as a master-amendment ask rather than shipping a 2-bullet role.)
 
 **Projects:** 2–3 typical. Rank by `strength` tier for archetype, then keyword overlap with JD. **Projects appear BEFORE Experience by default.** Invert (Experience above Projects) only for heavily experience-weighted JDs; note the inversion in the screening-prep notes.
 
@@ -146,7 +148,7 @@ After the script writes the `.docx`:
 2. **No em-dashes (—) in prose.** En-dashes (–) in date ranges are fine. Em-dashes inside cert titles (e.g. "Model Context Protocol — Advanced Topics") are exempt because they are the issuer's official cert name.
 3. **No AI-tell phrases:** "track record," "leverage" (as a verb), "transformative," "robust," "seamlessly," "cutting-edge," "spearheaded," the "X — Y, transforming Z" cadence. Use grep over the working script source before running.
 4. **Metrics fidelity:** every quantitative claim matches the master's METRICS table verbatim.
-5. **Page target:** 2 pages. If overflow risk, trim in this order: older-role bullets → weakest project → skill categories → coursework.
+5. **Page length:** 2 pages preferred, 3 pages acceptable. Do not burn cycles trimming content to fit two pages — the bullets, projects, and skills carry the application. If the resume naturally runs to 3 pages because the JD pulled a lot of master content into scope, ship it.
 
 ### Step 8: Save the JD + screening notes
 
@@ -198,7 +200,7 @@ The orchestrator base64-encodes both files, POSTs them to the Apps Script webhoo
 
 ## Style rules (enforced, same as local skill)
 
-- **Page size:** US Letter (8.5" × 11"), ~0.7" margins for 2-page target.
+- **Page size:** US Letter (8.5" × 11"), ~0.7" margins; 2 pages preferred but soft, 3 pages acceptable.
 - **Font:** Calibri throughout, 10pt body, 11pt role headers, 16pt name header.
 - **Section headings:** ALL CAPS, bold, 11pt, thin black bottom border.
 - **Role headers:** Company bold left, location bold right-aligned; role italic left, dates italic right-aligned.
@@ -214,7 +216,7 @@ The orchestrator base64-encodes both files, POSTs them to the Apps Script webhoo
 1. **Never fabricate experience.** If something isn't in the master, it doesn't go in the resume. Adjacent framing is fine; invention is not.
 2. **Preserve canonical metrics verbatim.** Pull from the METRICS table by ID. Do not rephrase, round, or merge.
 3. **Honesty on gaps beats keyword stuffing.** An ATS-beating resume that fails the screen is worse than an honest one that passes fewer filters.
-4. **Two pages is the default.** Longer only on explicit upstream instruction.
+4. **Two pages is the preference, not a hard constraint.** Let the resume run to three pages rather than trimming content to fit. Four+ pages still warrants a content review.
 5. **Output must be a `.docx`.** The orchestrator sends `.docx` bytes to the Apps Script webhook for Drive archive + Gmail attachment; PDF / markdown are NOT acceptable.
 6. **No em-dashes in prose.** Enforce even if the master accidentally contains them.
 7. **Silent gap-check.** The Routine has no user to ask; document gaps in the JD `.txt` for downstream screening.

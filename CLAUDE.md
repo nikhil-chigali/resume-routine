@@ -121,7 +121,7 @@ The Drive folder IDs that used to live here have moved to **Apps Script Script P
 
 - **No filesystem persistence between runs.** The Routine's only persistent output is the webhook POST. The repo state is read-only at runtime.
 - **No fabrication.** The honest-gap discipline in the master is binding. If a JD requires a capability not in the master and not in the honest-gaps table, surface it in the JD `.txt` (which the webhook archives to Drive) as a noted gap. Do NOT silently invent.
-- **Style rules are enforced.** No em-dashes in prose. No AI-tell phrases ("track record," "leverage" as verb, "transformative," "robust," "seamlessly," "cutting-edge," "spearheaded"). Calibri throughout. US Letter, ~0.7" margins, 2-page target.
+- **Style rules are enforced.** No em-dashes in prose. No AI-tell phrases ("track record," "leverage" as verb, "transformative," "robust," "seamlessly," "cutting-edge," "spearheaded"). Calibri throughout. US Letter, ~0.7" margins; 2 pages preferred but soft (3 pages OK).
 - **No PII to logs.** The Routine MUST NOT log JD content, resume content, base64 payloads, or env var values. Log only the threadId, the two fileIds the webhook returns, and high-level status (e.g., `posted`, `retried`, `failed`).
 - **Base64 stays out of the model context.** Build the POST body in a subprocess (the `node -e ...` pattern above). The model writes the curl invocation once; the file bytes never reach the token stream.
 - **The secret stays in the webhook body only.** Do NOT echo `WEBAPP_SECRET` into logs or include it in headers, query strings, or filenames.

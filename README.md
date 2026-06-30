@@ -160,7 +160,7 @@ The local `resume-tailor` skill at `<project_root>/.claude/skills/resume-tailor/
 ## Non-negotiables (lifted from CLAUDE.md)
 
 - **No fabrication.** Honest-gap discipline is binding. If a JD requires a capability not in the master and not in the honest-gaps table, surface it in the JD `.txt` (which the webhook archives to Drive) as a noted gap. Do not silently invent.
-- **Style rules enforced.** No em-dashes in prose. No AI-tell phrases. Calibri throughout. US Letter, ~0.7" margins, 2-page target.
+- **Style rules enforced.** No em-dashes in prose. No AI-tell phrases. Calibri throughout. US Letter, ~0.7" margins; 2 pages preferred but soft (3 pages OK).
 - **No PII to logs.** The Routine must not log JD content, resume content, or base64 payloads. Log only `threadId`, the two `fileId`s the webhook returns, and high-level status.
 - **Base64 stays out of the model context.** Build the POST body in a subprocess (the `node -e ...` pattern in CLAUDE.md Step 3). The model writes the `curl` invocation once; the file bytes never reach the token stream.
 - **The secret stays in the POST body only.** Never echo `WEBAPP_SECRET` into logs, headers, query strings, or filenames.
