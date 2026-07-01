@@ -635,6 +635,13 @@ Grouped by theme below; preserve verification links on output. Most are Anthropi
 
 **Statement of Accomplishment: AI Agent Fundamentals** — DataCamp. Verify: https://www.datacamp.com/statement-of-accomplishment/track/5a1f952d176de2dcf258a612a0c4579a13964f8d?raw=1
 
+### `CERT-DATACAMP-AIENG`
+- strength: S for GENAI, FULLSTACK-GENAI; A for MLOPS, AGENTS; B elsewhere
+- archetype: [GENAI, FULLSTACK-GENAI, AGENTS, MLOPS]
+- keywords: AI engineering, LLM application development, Python, developer productivity, associate-level credential, AI Engineer for Developers
+
+**Statement of Accomplishment: Associate AI Engineer for Developers** — DataCamp (Jul 2026). Credential ID #885,962. Verify: https://www.datacamp.com/statement-of-accomplishment/track/195cd2b2685b90ffdaeccd2f4d5308a5229b353f?raw=1
+
 ---
 
 ## EDUCATION
